@@ -1,0 +1,58 @@
+-- 1. Clean the Slate
+DROP VIEW IF EXISTS risk_action_summary;
+DROP TABLE IF EXISTS action_plan;
+
+-- 2. Create the Table (Strict Status Rule)
+CREATE TABLE action_plan (
+    id              SERIAL PRIMARY KEY,
+    risk_id         INTEGER         REFERENCES fine_kinney_risk(id), 
+    hierarchy       VARCHAR(50),    
+    control_measure TEXT            NOT NULL,
+    owner           VARCHAR(100),
+    deadline        VARCHAR(20),    
+    status          VARCHAR(30)     NOT NULL CHECK (status IN ('Open', 'In Progress', 'Closed')),
+    created_at      TIMESTAMPTZ     DEFAULT NOW()
+);
+
+-- 3. Bulletproof Insert (With Explicit Statuses)
+INSERT INTO action_plan (risk_id, hierarchy, control_measure, owner, deadline, status)
+VALUES
+    (
+        (SELECT id FROM fine_kinney_risk WHERE hazard = 'Forklift vs Pedestrian' LIMIT 1), 
+        'Engineering', 
+        'Install physical barriers and dedicated blue light projection on the floor', 
+        'HSE Lead', 
+        'Q3 2026',
+        'Open'
+    ),
+    (
+        (SELECT id FROM fine_kinney_risk WHERE hazard = 'Manual Handling (Back)' LIMIT 1), 
+        'Administrative', 
+        'Mandatory training on lifting techniques + ergonomic floor mats', 
+        'MPH Coord', 
+        'Ongoing',
+        'Closed'
+    ),
+    (
+        (SELECT id FROM fine_kinney_risk WHERE hazard = 'Improper Chem Storage' LIMIT 1), 
+        'Substitution', 
+        'Replace hazardous cleaning agents with ISO 14001 compliant bio-solvents', 
+        'ERM Spec', 
+        'Q4 2026',
+        'In Progress'
+    );
+
+-- 4. Recreate the View
+CREATE VIEW risk_action_summary AS
+SELECT
+    fk.hazard,
+    fk.score,
+    fk.priority,
+    ap.hierarchy,
+    ap.control_measure,
+    ap.owner,
+    ap.deadline,
+    ap.status
+FROM fine_kinney_risk fk
+LEFT JOIN action_plan ap
+    ON fk.id = ap.risk_id;
